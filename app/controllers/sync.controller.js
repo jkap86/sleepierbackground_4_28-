@@ -214,7 +214,7 @@ exports.leaguemates = async (app) => {
     const updateLeaguemateLeagues = async (app) => {
         const state = app.get('state')
         const week = state.season_type === 'regular' ? state.week : 1
-        const increment_new = Math.ceil(1000 / (5 + week));
+        const increment_new = 100;
 
         const cutoff = new Date(new Date() - (24 * 60 * 60 * 1000))
 
@@ -406,10 +406,10 @@ exports.leaguemates = async (app) => {
 
                         try {
                             if (type === 'add') {
-                                Array.from(Array(week).keys()).map(async key => {
+                                await Promise.all(Array.from(Array(week).keys()).map(async key => {
                                     let matchups_week = await axios.get(`https://api.sleeper.app/v1/league/${league_id}/matchups/${key + 1}`)
                                     matchups[`matchups_${key + 1}`] = matchups_week.data
-                                })
+                                }))
                             } else {
                                 let matchups_week = await axios.get(`https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`)
                                 matchups[`matchups_${week}`] = matchups_week.data
