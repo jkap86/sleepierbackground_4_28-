@@ -86,7 +86,7 @@ exports.trades = async (app) => {
 
 
         await Promise.all(leagues_to_update
-            .filter(x => x.dataValues.rosters)
+            .filter(x => x.dataValues.rosters.find(r => r.players?.length > 0))
             .map(async league => {
                 let trades_league = []
                 let transactions_league;
@@ -133,7 +133,7 @@ exports.trades = async (app) => {
                                         username: old_roster?.username,
                                         avatar: old_roster?.avatar,
                                     },
-                                    order: draft_order && roster?.user_id ? draft_order[roster?.user_id] : null
+                                    order: draft_order && roster?.user_id && pick.season === state.league_season ? draft_order[roster?.user_id] : null
                                 }
                             })
 
