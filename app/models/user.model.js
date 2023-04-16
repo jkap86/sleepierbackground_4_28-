@@ -20,7 +20,8 @@ module.exports = (sequelize, Sequelize) => {
     }, {
         indexes: [
             {
-                fields: ['user_id']
+                fields: ['user_id'],
+
             }
         ]
     });

@@ -36,6 +36,7 @@ function start() {
 
 
     require("./app/routes/sync.routes")(app);
+    require("./app/routes/dynastyrankings.routes")(app);
 
     app.get('/', (req, res) => {
         res.send('ping')

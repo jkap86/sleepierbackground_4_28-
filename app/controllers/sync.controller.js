@@ -13,6 +13,7 @@ const axios = require('axios').create({
     timeout: 2000
 });
 const axiosRetry = require('axios-retry');
+const ALLPLAYERS = require('../../allplayers.json');
 
 axiosRetry(axios, {
     retries: 3,
@@ -25,8 +26,30 @@ axiosRetry(axios, {
 })
 
 exports.boot = async (app) => {
+    const getAllPlayers = async () => {
+        let sleeper_players;
+        if (process.env.DATABASE_URL) {
+            try {
+                sleeper_players = await axios.get('https://api.sleeper.app/v1/players/nfl')
+                sleeper_players = sleeper_players.data
+
+            } catch (error) {
+                console.log(error)
+            }
+        } else {
+            console.log('getting allplayers from file...')
+
+            sleeper_players = ALLPLAYERS
+        }
+
+
+        return sleeper_players
+    }
     const state = await axios.get('https://api.sleeper.app/v1/state/nfl')
+    const allplayers = await getAllPlayers()
+
     app.set('state', state.data)
+    app.set('allplayers', allplayers)
 
     app.set('trades_sync_counter', 0)
 
@@ -40,8 +63,11 @@ exports.boot = async (app) => {
 
     setInterval(async () => {
         const state = await axios.get('https://api.sleeper.app/v1/state/nfl')
+        const allplayers = await getAllPlayers()
+
         app.set('state', state.data)
-    }, 1 * 60 * 60 * 1000)
+        app.set('allplayers', allplayers)
+    }, 12 * 60 * 60 * 1000)
 }
 
 exports.trades = async (app) => {
@@ -55,6 +81,8 @@ exports.trades = async (app) => {
                 await updateTrades(app)
                 app.set('syncing', 'false')
                 console.log(`Transactions Sync completed at ${new Date()}`)
+            } else {
+                'Trade sync skipped - another sync in progress'
             }
 
             const used = process.memoryUsage()
@@ -203,6 +231,8 @@ exports.leaguemates = async (app) => {
             await updateLeaguemateLeagues(app)
             app.set('syncing', 'false')
             console.log(`Leaguemates Sync completed at ${new Date()}`)
+        } else {
+            'Trade sync skipped - another sync in progress'
         }
 
         const used = process.memoryUsage()
