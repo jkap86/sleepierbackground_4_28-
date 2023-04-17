@@ -425,12 +425,12 @@ exports.updateDaily = async (app) => {
         const rankings_today = await getValue()
 
 
-        const match_today = matchRankingsWeek(new Date(), rankings_today, stateAllPlayers)
+        const match_today = matchRankingsWeek(new Date(new Date().getTime() - (new Date().getTimezoneOffset() + 240) * 60000), rankings_today, stateAllPlayers)
 
 
         try {
             await DynastyRankings.upsert({
-                date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
+                date: new Date(new Date().getTime() - (new Date().getTimezoneOffset() + 240) * 60000).toISOString().split('T')[0],
                 values: match_today.values
 
             })
