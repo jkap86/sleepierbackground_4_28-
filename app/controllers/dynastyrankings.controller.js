@@ -406,60 +406,52 @@ exports.historical = async (app) => {
 }
 
 exports.updateDaily = async (app) => {
-    const date = new Date()
-    const tzOffset = date.getTimezoneOffset()
-    const tzOffset_ms = (tzOffset + 240) * 60 * 1000
-    const date_tz = new Date(date + tzOffset_ms)
-    const hour = date_tz.getHours()
-    const minute = date_tz.getMinutes()
-
-    const now = new Date(); // current date and time
-    const midnightET = new Date(now.toLocaleDateString('en-US', { timeZone: 'America/New_York' })); // midnight ET today
-    const delay = ((60 - new Date().getMinutes()) * 60 * 1000);
-
-    console.log(`next rankings update at ${new Date(new Date().getTime() - tzOffset_ms + delay)}`)
-    setTimeout(async () => {
+    const getDailyValues = async () => {
+        app.set('syncing', 'true')
         console.log(`Beginning daily rankings update at ${new Date()}`)
 
         const stateAllPlayers = app.get('allplayers')
-        const rankings_today = await getValue()
+        const ktc = await axios.post('https://keeptradecut.com/dynasty-rankings/history')
 
+        const daily_values = {}
 
-        const match_today = matchRankingsWeek(new Date(new Date().getTime() - (new Date().getTimezoneOffset() + 240) * 60000), rankings_today, stateAllPlayers)
-
+        ktc.data.map(ktc_player => {
+            const sleeper_id = matchPlayer(ktc_player, stateAllPlayers)
+            daily_values[sleeper_id] = {
+                oneqb: ktc_player.oneQBValues.value,
+                sf: ktc_player.superflexValues.value
+            }
+        })
 
         try {
             await DynastyRankings.upsert({
-                date: new Date(new Date().getTime() - (new Date().getTimezoneOffset() + 240) * 60000).toISOString().split('T')[0],
-                values: match_today.values
+                date: new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })).toISOString().split('T')[0],
+                values: daily_values
 
             })
         } catch (error) {
             console.log(error)
         }
+        app.set('syncing', 'false')
+        console.log(`Update Complete`)
+    }
+
+    setTimeout(async () => {
+        await getDailyValues()
+    }, 10000)
+
+    const eastern_time = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }))
+
+    const delay = ((60 - new Date(eastern_time).getMinutes()) * 60 * 1000);
+
+    console.log(`next rankings update at ${delay / 60000} min`)
+    setTimeout(async () => {
+
 
         setInterval(async () => {
-            app.set('syncing', 'true')
-            console.log(`Beginning daily rankings update at ${new Date()}`)
+            await getDailyValues()
 
-            const stateAllPlayers = app.get('allplayers')
-            const rankings_today = await getValue()
-
-
-            const match_today = matchRankingsWeek(new Date(), rankings_today, stateAllPlayers)
-
-
-            try {
-                await DynastyRankings.upsert({
-                    date: new Date(new Date().getTime() - (new Date().getTimezoneOffset() + 240) * 60000).toISOString().split('T')[0],
-                    values: match_today.values
-
-                })
-            } catch (error) {
-                console.log(error)
-            }
-            app.set('syncing', 'false')
-            console.log(`Update Complete`)
         }, 1 * 60 * 60 * 1000)
+
     }, delay)
 }
