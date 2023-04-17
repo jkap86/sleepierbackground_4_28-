@@ -186,6 +186,7 @@ exports.trades = async (app) => {
                                     rosters: league.dataValues.rosters,
                                     managers: managers,
                                     users: league.dataValues.rosters.filter(r => parseInt(r.user_id) > 0).map(r => r.user_id),
+                                    players: [...Object.keys(adds), ...draft_picks.map(pick => `${pick.season} ${pick.round}.${pick.order}`)],
                                     adds: adds,
                                     drops: drops,
                                     draft_picks: draft_picks,
@@ -198,7 +199,7 @@ exports.trades = async (app) => {
                     console.log(error)
                 }
                 try {
-                    await Trade.bulkCreate(trades_league, { ignoreDuplicates: true })
+                    await Trade.bulkCreate(trades_league, { updateOnDuplicate: ['players'] })
                 } catch (error) {
                     console.log(error)
 

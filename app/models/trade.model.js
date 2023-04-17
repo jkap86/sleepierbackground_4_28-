@@ -21,6 +21,9 @@ module.exports = (sequelize, Sequelize) => {
         users: {
             type: DataTypes.ARRAY(DataTypes.STRING)
         },
+        players: {
+            type: DataTypes.ARRAY(DataTypes.STRING)
+        },
         adds: {
             type: Sequelize.JSONB
         },
