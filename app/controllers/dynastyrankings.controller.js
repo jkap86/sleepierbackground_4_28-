@@ -436,9 +436,7 @@ exports.updateDaily = async (app) => {
         console.log(`Update Complete`)
     }
 
-    setTimeout(async () => {
-        await getDailyValues()
-    }, 10000)
+
 
     const eastern_time = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }))
 
