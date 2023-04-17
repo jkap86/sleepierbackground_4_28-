@@ -408,18 +408,21 @@ exports.historical = async (app) => {
 exports.updateDaily = async (app) => {
     const date = new Date()
     const tzOffset = date.getTimezoneOffset()
-    const tzOffset_ms = tzOffset * 60 * 1000
+    const tzOffset_ms = (tzOffset + 240) * 60 * 1000
     const date_tz = new Date(date + tzOffset_ms)
     const hour = date_tz.getHours()
     const minute = date_tz.getMinutes()
 
     let delay;
-    if (hour < 3) {
-        delay = (((3 - hour) * 60) + (60 - minute)) * 60 * 1000
-    } else {
-        delay = (((27 - hour) * 60) + (60 - minute)) * 60 * 1000
-    }
 
+    delay = (((23 - hour) * 60) + (60 - minute)) * 60 * 1000
+    /*
+        if (hour < 3) {
+            delay = (((3 - hour) * 60) + (60 - minute)) * 60 * 1000
+        } else {
+            delay = (((27 - hour) * 60) + (60 - minute)) * 60 * 1000
+        }
+    */
     console.log(`next rankings update at ${new Date(new Date().getTime() + delay)}`)
     setTimeout(async () => {
         console.log(`Beginning daily rankings update at ${new Date()}`)
