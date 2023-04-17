@@ -413,17 +413,11 @@ exports.updateDaily = async (app) => {
     const hour = date_tz.getHours()
     const minute = date_tz.getMinutes()
 
-    let delay;
+    const now = new Date(); // current date and time
+    const midnightET = new Date(now.toLocaleDateString('en-US', { timeZone: 'America/New_York' })); // midnight ET today
+    const delay = ((60 - new Date().getMinutes()) * 60 * 1000);
 
-    delay = (((23 - hour) * 60) + (60 - minute)) * 60 * 1000
-    /*
-        if (hour < 3) {
-            delay = (((3 - hour) * 60) + (60 - minute)) * 60 * 1000
-        } else {
-            delay = (((27 - hour) * 60) + (60 - minute)) * 60 * 1000
-        }
-    */
-    console.log(`next rankings update at ${new Date(new Date().getTime() + delay)}`)
+    console.log(`next rankings update at ${new Date(new Date().getTime() - tzOffset_ms + delay)}`)
     setTimeout(async () => {
         console.log(`Beginning daily rankings update at ${new Date()}`)
 
@@ -457,7 +451,7 @@ exports.updateDaily = async (app) => {
 
             try {
                 await DynastyRankings.upsert({
-                    date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
+                    date: new Date(new Date().getTime() - (new Date().getTimezoneOffset() + 240) * 60000).toISOString().split('T')[0],
                     values: match_today.values
 
                 })
@@ -466,6 +460,6 @@ exports.updateDaily = async (app) => {
             }
             app.set('syncing', 'false')
             console.log(`Update Complete`)
-        }, 24 * 60 * 60 * 1000)
+        }, 1 * 60 * 60 * 1000)
     }, delay)
 }
