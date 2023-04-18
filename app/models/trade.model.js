@@ -35,6 +35,9 @@ module.exports = (sequelize, Sequelize) => {
         },
         drafts: {
             type: Sequelize.JSONB
+        },
+        price_check: {
+            type: Sequelize.JSONB
         }
     }, {
         indexes: [

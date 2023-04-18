@@ -95,7 +95,7 @@ exports.trades = async (app) => {
     const updateTrades = async (app) => {
         const state = app.get('state')
         let i = app.get('trades_sync_counter')
-        const increment = 500
+        const increment = 250
 
         let leagues_to_update;
         try {
@@ -177,6 +177,23 @@ exports.trades = async (app) => {
                                 return drops[drop] = user?.user_id
                             })
 
+                            const pricecheck = []
+                            managers.map(user_id => {
+                                const count = Object.values(adds).filter(a => adds[a] === user_id).length
+                                    + draft_picks.filter(pick => pick.new_user.user_id === user_id).length
+
+                                if (count === 1) {
+                                    const player = Object.keys(adds).find(a => adds[a] === user_id)
+                                    if (player) {
+                                        pricecheck.push(player)
+                                    } else {
+                                        const pick = draft_picks.find(pick => pick.new_user.user_id === user_id)
+                                        pricecheck.push(`${pick.season} ${pick.round}.${pick.order}`)
+                                    }
+                                }
+                            })
+
+
                             if (transaction.type === 'trade') {
 
                                 trades_league.push({
@@ -190,7 +207,8 @@ exports.trades = async (app) => {
                                     adds: adds,
                                     drops: drops,
                                     draft_picks: draft_picks,
-                                    drafts: league.dataValues.drafts
+                                    drafts: league.dataValues.drafts,
+                                    price_check: pricecheck
                                 })
                             }
 
@@ -199,7 +217,7 @@ exports.trades = async (app) => {
                     console.log(error)
                 }
                 try {
-                    await Trade.bulkCreate(trades_league, { updateOnDuplicate: ['players'] })
+                    await Trade.bulkCreate(trades_league, { updateOnDuplicate: ['price_check'] })
                 } catch (error) {
                     console.log(error)
 
