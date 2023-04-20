@@ -25,7 +25,10 @@ db.sequelize = sequelize;
 db.users = require("./user.model.js")(sequelize, Sequelize);
 db.leagues = require("./league.model.js")(sequelize, Sequelize);
 db.trades = require("./trade.model.js")(sequelize, Sequelize);
-db.dynastyrankings = require("./dynastyrankings.model.js")(sequelize, Sequelize)
+
+const player_data = require("./dynastyrankings.model.js")(sequelize, Sequelize)
+db.dynastyrankings = player_data.DynastyRankings
+db.stats = player_data.Stats
 
 db.users.belongsToMany(db.leagues, { through: 'userLeagues' })
 db.leagues.belongsToMany(db.users, { through: 'userLeagues' })

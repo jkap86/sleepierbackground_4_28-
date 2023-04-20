@@ -7,9 +7,13 @@ module.exports = app => {
 
     dynastyrankings.updateDaily(app)
 
-    dynastyrankings.updateHistorical(app)
+    //  dynastyrankings.updateHistorical(app)
 
     //  dynastyrankings.historical(app)
+
+    dynastyrankings.alltime(app)
+
+    dynastyrankings.uploadStats(app)
 
     app.use('/dynastyrankings', router);
 }

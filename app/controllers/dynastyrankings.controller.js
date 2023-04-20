@@ -1,6 +1,7 @@
 'use strict'
 const db = require("../models");
 const DynastyRankings = db.dynastyrankings;
+const Stats = db.stats;
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio')
 const https = require('https');
@@ -9,10 +10,11 @@ const axios = require('axios').create({
         'content-type': 'application/json'
     },
     httpsAgent: new https.Agent({ rejectUnauthorized: false, keepAlive: true }),
-    timeout: 3000
+    timeout: 7000
 });
 const axiosRetry = require('axios-retry');
 const ALLPLAYERS = require('../../allplayers.json');
+const fs = require('fs');
 
 axiosRetry(axios, { retries: 3 })
 
@@ -45,55 +47,80 @@ const getValue = async () => {
     })
     return elements
 }
-
-const getHistorcalValues = async (players) => {
+async function wait(timeout) {
+    return new Promise(resolve => setTimeout(resolve, timeout));
+}
+const getHistorcalValues = async (players, superflex) => {
 
     let elements = {}
     const unmatched = {}
-    for (const player of Object.keys(players)) {
-
+    for (const player of Object.keys(players).slice(0, 5)) {
+        console.log('Begin ' + players[player].name + ' at ' + new Date().toLocaleTimeString())
         const browser = await puppeteer.launch();
         let html;
         const page = await browser.newPage();
-        page.setDefaultTimeout(7000)
+
+        page.setDefaultTimeout(15000)
+
+        const getPlayerValues = async () => {
+            await page.goto('https://keeptradecut.com/' + players[player].link);
+
+            const interval = setInterval(async () => {
+                try {
+
+                    const modal = await page.$('span#dont-know');
+                    if (modal) {
+                        await modal.click();
+                    }
+                } catch (err) {
+
+
+
+                }
+            }, 1000)
+
+            await page.$('div.sidebar div.sf-toggle-wrapper')
+
+            await page.$eval('div.sidebar div.sf-toggle-wrapper', (element) => {
+                element.classList.remove('superflex');
+                element.classList.add('oneqb');
+            });
+
+            const alltime = await page.$('#pd-value-graph #all-time');
+
+            await alltime.click()
+
+            await page.$eval('#pd-value-graph #all-time', (element) => {
+                element.classList.add('active')
+            })
+
+
+            const data = await page.$('#pd-value-graph div#all-time.active')
+            await wait(3000)
+            if (data) {
+                html = await page.content();
+            }
+
+            return html
+        }
+
         while (!html) {
             try {
 
 
-                await page.goto('https://keeptradecut.com/' + players[player].link);
 
-                await page.waitForSelector('svg.pd-value-svg');
-
-                const option_all_time = await page.$('#all-time')
-
-                await option_all_time.click()
-
-                await page.waitForSelector('div.config.active:has-text("All Time")')
-                html = await page.content();
+                html = await getPlayerValues()
 
             } catch (error) {
 
-                try {
+                console.log(players[player].name)
 
 
-                    await page.goto('https://keeptradecut.com/' + players[player].link);
 
-                    const svg = await page.$('svg.pd-value-svg');
-
-                    if (svg) {
-                        html = await page.content();
-                    }
-                } catch (error) {
-                    console.log({
-                        name: players[player].name,
-                        link: players[player].link
-                    })
-                    unmatched[player] = players[player]
-                }
             }
         }
 
-        await browser.close()
+
 
         let $ = cheerio.load(html)
 
@@ -164,7 +191,7 @@ const getHistorcalValues = async (players) => {
 
 
         )
-        console.log(`${players[player].name} Id: ${players[player].player_id} Complete`)
+        console.log('End ' + players[player].name + ' at ' + new Date().toLocaleTimeString())
     }
     return {
         rankings: elements,
@@ -267,16 +294,16 @@ const matchPlayer = (player, stateAllPlayers) => {
                 if (stateAllPlayers[player_id]?.college === player.college) {
                     match_score += 1
                 }
-                if (stateAllPlayers[player_id]?.number === player.number) {
+                if (stateAllPlayers[player_id]?.number === player.jersey) {
                     match_score += 1
                 }
                 if ((stateAllPlayers[player_id]?.team || 'FA') === matchTeam(player.team)) {
                     match_score += 1
                 }
-                if (stateAllPlayers[player_id]?.years_exp === player.seasonsExperience || 0) {
+                if (stateAllPlayers[player_id]?.years_exp === player.yrs_exp || 0) {
                     match_score += 1
                 }
-                if (player.playerName.replace('III', '').replace('II', '').replace('Jr', '').trim().toLowerCase().replace(/[^a-z]/g, "") === stateAllPlayers[player_id]?.search_full_name?.trim()) {
+                if (player.name?.replace('III', '').replace('II', '').replace('Jr', '').trim().toLowerCase().replace(/[^a-z]/g, "") === stateAllPlayers[player_id]?.search_full_name?.trim()) {
                     match_score += 5
                 }
 
@@ -288,8 +315,6 @@ const matchPlayer = (player, stateAllPlayers) => {
             .sort((a, b) => b.match_score - a.match_score)
 
         return players_to_search[0].player_id
-
-
     }
 
 }
@@ -425,7 +450,7 @@ exports.updateDaily = async (app) => {
 
         try {
             await DynastyRankings.upsert({
-                date: new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })).toISOString().split('T')[0],
+                date: new Date(new Date().getTime()),
                 values: daily_values
 
             })
@@ -438,7 +463,7 @@ exports.updateDaily = async (app) => {
 
 
 
-    const eastern_time = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }))
+    const eastern_time = new Date(new Date().getTime() - 240 * 60 * 1000)
 
     const delay = ((60 - new Date(eastern_time).getMinutes()) * 60 * 1000);
 
@@ -452,4 +477,189 @@ exports.updateDaily = async (app) => {
         }, 1 * 60 * 60 * 1000)
 
     }, delay)
+}
+
+exports.alltime = async (app) => {
+    /*
+    const current_values = await getValue()
+
+    fs.writeFile('current_values.json', JSON.stringify(current_values), (err) => {
+        if (err) {
+            console.error(err);
+            return;
+        }
+        console.log('Current values written to current_values.json');
+    });
+    
+
+
+
+
+    const current_values = require('../../current_values.json');
+
+    const alltime_values = await getHistorcalValues(current_values, false)
+
+    fs.writeFile('alltime_values_oneqb.json', JSON.stringify(alltime_values), (err) => {
+        if (err) {
+            console.error(err);
+            return;
+        }
+        console.log('All time values written to alltime_values_oneqb.json');
+    });
+
+  
+        setTimeout(() => {
+            const stateAllPlayers = app.get('allplayers')
+            const alltime_values = require('../../alltime_values.json');
+    
+            const alltime_dict = {}
+    
+            Object.keys(alltime_values.rankings).map(date => {
+                const date_values = {}
+                if (!alltime_dict[date]) {
+                    alltime_dict[date] = {}
+                }
+                Object.keys(alltime_values.rankings[date]).map(link => {
+                    const player_id = matchPlayer(alltime_values.rankings[date][link] || {}, stateAllPlayers)
+                    if (!alltime_dict[date][player_id]) {
+                        alltime_dict[date][player_id] = []
+                    }
+    
+                    alltime_dict[date][player_id].push(alltime_values.rankings[date][link])
+    
+                })
+                console.log(`${date} rankings added`)
+            })
+            fs.writeFile('alltime_dict.json', JSON.stringify(alltime_dict), (err) => {
+                if (err) {
+                    console.error(err);
+                    return;
+                }
+                console.log('alltime_values.json values written to alltime_dict.json');
+            });
+        }, 5000)
+    
+  
+        const alltime = require('../../alltime_dict.json');
+    
+        const alltime_array = []
+    
+        Object.keys(alltime).map(date => {
+            let values = {}
+    
+            Object.keys(alltime[date])
+                .map(player_id => {
+                    values[player_id] = alltime[date][player_id][0]
+                })
+    
+            return alltime_array.push({
+                date: new Date(date),
+                values: values
+            })
+        })
+    
+        await DynastyRankings.bulkCreate(alltime_array, { ignoreDuplicates: true })
+      */
+
+
+    const alltime = require('../../alltime_dict.json');
+
+    let values = {}
+
+
+    for (const player_id of Object.keys(alltime["2023-04-15"])) {
+        const getValues = async () => {
+            const link = 'https://keeptradecut.com/' + alltime["2023-04-15"][player_id][0].link
+            const source_code = await axios.get(link)
+
+            let $ = cheerio.load(source_code.data)
+
+            const scriptTag = $('script').filter(function () {
+                return $(this).html().includes('var playerSuperflex');
+            })
+
+
+            // Extract the value assigned to the playerSuperflex variable
+            const superflexValues = scriptTag.text().match(/var playerSuperflex = (.+);/)[1];
+            const oneQBValues = scriptTag.text().match(/var playerOneQB = (.+);/)[1];
+
+            // Parse the JSON-formatted data to a JavaScript object
+            const superflexData = JSON.parse(superflexValues);
+            const oneQBData = JSON.parse(oneQBValues)
+
+            return {
+                sf: Object.values(superflexData.overallValue),
+                oneQB: Object.values(oneQBData.overallValue)
+            }
+        }
+
+        const player_values_history = await getValues()
+
+        player_values_history.sf.map(value_date_object => {
+            if (!values[value_date_object.d]) {
+                values[value_date_object.d] = {}
+            }
+
+            if (!values[value_date_object.d][player_id]) {
+                values[value_date_object.d][player_id] = {}
+            }
+
+            values[value_date_object.d][player_id].sf = value_date_object.v
+        })
+
+        player_values_history.oneQB.map(value_date_object => {
+            if (!values[value_date_object.d]) {
+                values[value_date_object.d] = {}
+            }
+
+            if (!values[value_date_object.d][player_id]) {
+                values[value_date_object.d][player_id] = {}
+            }
+
+            values[value_date_object.d][player_id].oneqb = value_date_object.v
+        })
+        console.log(`Values fetched for ${player_id} `)
+    }
+
+    const values_array = []
+
+    Object.keys(values).map(date => {
+        return values_array.push({
+            date: new Date(new Date(date).getTime()),
+            values: values[date]
+        })
+    })
+    await DynastyRankings.bulkCreate(values_array, { updateOnDuplicate: ['date', 'values'] })
+}
+
+exports.uploadStats = async (app) => {
+
+    const stats = []
+    for (let season = 2009; season < 2023; season++) {
+        const num_weeks = season < 2022 ? 16 : 17
+
+        for (let week = 1; week <= num_weeks; week++) {
+            const weekly_stats = require(`../../NFL Weekly Stats 2009-2022/${season}_Week${week}_Stats.json`)
+
+            weekly_stats.map(stats_object => {
+                return stats.push({
+                    season: stats_object.season,
+                    week: stats_object.week,
+                    player_id: stats_object.player_id,
+                    team: stats_object.team,
+                    opponent: stats_object.opponent,
+                    stats: stats_object.stats,
+                    date: stats_object.date
+                })
+            })
+        }
+
+    }
+
+    try {
+        await Stats.bulkCreate(stats, { ignoreDuplicates: true })
+    } catch (err) {
+        console.log(err.message)
+    }
+
 }
