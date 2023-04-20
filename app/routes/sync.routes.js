@@ -5,7 +5,7 @@ module.exports = app => {
 
     syncs.boot(app)
 
-    //syncs.leaguemates(app)
+    syncs.leaguemates(app)
 
-    //  syncs.trades(app)
+    syncs.trades(app)
 }
