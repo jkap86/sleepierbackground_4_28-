@@ -11,7 +11,7 @@ module.exports = app => {
 
     //  dynastyrankings.historical(app)
 
-    dynastyrankings.alltime(app)
+    // dynastyrankings.alltime(app)
 
     dynastyrankings.uploadStats(app)
 
