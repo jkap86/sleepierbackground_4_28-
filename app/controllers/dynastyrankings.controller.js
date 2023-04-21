@@ -440,7 +440,9 @@ exports.updateDaily = async (app) => {
 
         const daily_values = {}
 
-        console.log(ktc.data)
+        const missing = {}
+
+
 
         ktc.data.map(ktc_player => {
             const sleeper_id = matchPlayer(ktc_player, stateAllPlayers)
@@ -448,13 +450,23 @@ exports.updateDaily = async (app) => {
                 oneqb: ktc_player.oneQBValues.value,
                 sf: ktc_player.superflexValues.value
             }
+
+            missing[sleeper_id] = {
+                oneqb: ktc_player.oneQBValues.history[ktc_player.superflexValues.history.length - 3]?.v,
+                sf: ktc_player.superflexValues.history[ktc_player.superflexValues.history.length - 3]?.v
+            }
+
         })
 
         try {
             await DynastyRankings.upsert({
                 date: new Date(new Date().getTime()),
                 values: daily_values
+            })
 
+            await DynastyRankings.upsert({
+                date: new Date(new Date().getTime() - 24 * 60 * 60 * 1000),
+                values: missing
             })
         } catch (error) {
             console.log(error)
@@ -478,7 +490,7 @@ exports.updateDaily = async (app) => {
             await getDailyValues()
         }, 1 * 60 * 60 * 1000)
 
-    }, delay)
+    }, 5000)
 }
 
 exports.alltime = async (app) => {
