@@ -294,16 +294,16 @@ const matchPlayer = (player, stateAllPlayers) => {
                 if (stateAllPlayers[player_id]?.college === player.college) {
                     match_score += 1
                 }
-                if (stateAllPlayers[player_id]?.number === player.jersey) {
+                if (stateAllPlayers[player_id]?.number === player.number) {
                     match_score += 1
                 }
                 if ((stateAllPlayers[player_id]?.team || 'FA') === matchTeam(player.team)) {
                     match_score += 1
                 }
-                if (stateAllPlayers[player_id]?.years_exp === player.yrs_exp || 0) {
+                if (stateAllPlayers[player_id]?.years_exp === player.seasonsExperience || 0) {
                     match_score += 1
                 }
-                if (player.name?.replace('III', '').replace('II', '').replace('Jr', '').trim().toLowerCase().replace(/[^a-z]/g, "") === stateAllPlayers[player_id]?.search_full_name?.trim()) {
+                if (player.playerName?.replace('III', '').replace('II', '').replace('Jr', '').trim().toLowerCase().replace(/[^a-z]/g, "") === stateAllPlayers[player_id]?.search_full_name?.trim()) {
                     match_score += 5
                 }
 
@@ -440,6 +440,8 @@ exports.updateDaily = async (app) => {
 
         const daily_values = {}
 
+        console.log(ktc.data)
+
         ktc.data.map(ktc_player => {
             const sleeper_id = matchPlayer(ktc_player, stateAllPlayers)
             daily_values[sleeper_id] = {
@@ -470,10 +472,10 @@ exports.updateDaily = async (app) => {
     console.log(`next rankings update at ${delay / 60000} min`)
     setTimeout(async () => {
 
+        await getDailyValues()
 
         setInterval(async () => {
             await getDailyValues()
-
         }, 1 * 60 * 60 * 1000)
 
     }, delay)
@@ -561,7 +563,7 @@ exports.alltime = async (app) => {
         await DynastyRankings.bulkCreate(alltime_array, { ignoreDuplicates: true })
       */
 
-
+    app.set('syncing', 'true')
     const alltime = require('../../alltime_dict.json');
 
     let values = {}
@@ -630,6 +632,7 @@ exports.alltime = async (app) => {
         })
     })
     await DynastyRankings.bulkCreate(values_array, { updateOnDuplicate: ['date', 'values'] })
+    app.set('syncing', 'false')
 }
 
 exports.uploadStats = async (app) => {
