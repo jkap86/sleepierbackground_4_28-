@@ -179,7 +179,7 @@ exports.trades = async (app) => {
 
                             const pricecheck = []
                             managers.map(user_id => {
-                                const count = Object.values(adds).filter(a => adds[a] === user_id).length
+                                const count = Object.keys(adds).filter(a => adds[a] === user_id).length
                                     + draft_picks.filter(pick => pick.new_user.user_id === user_id).length
 
                                 if (count === 1) {

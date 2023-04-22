@@ -561,76 +561,86 @@ exports.alltime = async (app) => {
         await DynastyRankings.bulkCreate(alltime_array, { ignoreDuplicates: true })
       */
 
-    app.set('syncing', 'true')
-    const alltime = require('../../alltime_dict.json');
+    setTimeout(async () => {
+        app.set('syncing', 'true')
 
-    let values = {}
+        const stateAllPlayers = app.get('allplayers')
+
+        const alltime = await axios.post('https://keeptradecut.com/dynasty-rankings/history')
+
+        let values = {}
+
+        for (const key of Object.keys(alltime.data)) {
+            const getValues = async () => {
+                const link = 'https://keeptradecut.com/dynasty-rankings/players/' + alltime.data[key].slug
+                const source_code = await axios.get(link)
+
+                let $ = cheerio.load(source_code.data)
+
+                const scriptTag = $('script').filter(function () {
+                    return $(this).html().includes('var playerSuperflex');
+                })
 
 
-    for (const player_id of Object.keys(alltime["2023-04-15"])) {
-        const getValues = async () => {
-            const link = 'https://keeptradecut.com/' + alltime["2023-04-15"][player_id][0].link
-            const source_code = await axios.get(link)
+                // Extract the value assigned to the playerSuperflex variable
+                const superflexValues = scriptTag.text().match(/var playerSuperflex = (.+);/)[1];
+                const oneQBValues = scriptTag.text().match(/var playerOneQB = (.+);/)[1];
 
-            let $ = cheerio.load(source_code.data)
+                // Parse the JSON-formatted data to a JavaScript object
+                const superflexData = JSON.parse(superflexValues);
+                const oneQBData = JSON.parse(oneQBValues)
 
-            const scriptTag = $('script').filter(function () {
-                return $(this).html().includes('var playerSuperflex');
+                return {
+                    sf: Object.values(superflexData.overallValue),
+                    oneQB: Object.values(oneQBData.overallValue)
+                }
+            }
+
+            const player_values_history = await getValues()
+
+
+
+            const player_id = matchPlayer(alltime.data[key], stateAllPlayers)
+
+
+            player_values_history.sf.map(value_date_object => {
+                if (!values[value_date_object.d]) {
+                    values[value_date_object.d] = {}
+                }
+
+                if (!values[value_date_object.d][player_id]) {
+                    values[value_date_object.d][player_id] = {}
+                }
+
+                values[value_date_object.d][player_id].sf = value_date_object.v
             })
 
+            player_values_history.oneQB.map(value_date_object => {
+                if (!values[value_date_object.d]) {
+                    values[value_date_object.d] = {}
+                }
 
-            // Extract the value assigned to the playerSuperflex variable
-            const superflexValues = scriptTag.text().match(/var playerSuperflex = (.+);/)[1];
-            const oneQBValues = scriptTag.text().match(/var playerOneQB = (.+);/)[1];
+                if (!values[value_date_object.d][player_id]) {
+                    values[value_date_object.d][player_id] = {}
+                }
 
-            // Parse the JSON-formatted data to a JavaScript object
-            const superflexData = JSON.parse(superflexValues);
-            const oneQBData = JSON.parse(oneQBValues)
-
-            return {
-                sf: Object.values(superflexData.overallValue),
-                oneQB: Object.values(oneQBData.overallValue)
-            }
+                values[value_date_object.d][player_id].oneqb = value_date_object.v
+            })
+            console.log(`Values fetched for ${stateAllPlayers[player_id]?.full_name || player_id} `)
         }
 
-        const player_values_history = await getValues()
+        const values_array = []
 
-        player_values_history.sf.map(value_date_object => {
-            if (!values[value_date_object.d]) {
-                values[value_date_object.d] = {}
-            }
-
-            if (!values[value_date_object.d][player_id]) {
-                values[value_date_object.d][player_id] = {}
-            }
-
-            values[value_date_object.d][player_id].sf = value_date_object.v
+        Object.keys(values).map(date => {
+            return values_array.push({
+                date: new Date(new Date(date).getTime()),
+                values: values[date]
+            })
         })
+        await DynastyRankings.bulkCreate(values_array, { updateOnDuplicate: ['date', 'values'] })
 
-        player_values_history.oneQB.map(value_date_object => {
-            if (!values[value_date_object.d]) {
-                values[value_date_object.d] = {}
-            }
-
-            if (!values[value_date_object.d][player_id]) {
-                values[value_date_object.d][player_id] = {}
-            }
-
-            values[value_date_object.d][player_id].oneqb = value_date_object.v
-        })
-        console.log(`Values fetched for ${player_id} `)
-    }
-
-    const values_array = []
-
-    Object.keys(values).map(date => {
-        return values_array.push({
-            date: new Date(new Date(date).getTime()),
-            values: values[date]
-        })
-    })
-    await DynastyRankings.bulkCreate(values_array, { updateOnDuplicate: ['date', 'values'] })
-    app.set('syncing', 'false')
+        app.set('syncing', 'false')
+    }, 5000)
 }
 
 exports.uploadStats = async (app) => {
