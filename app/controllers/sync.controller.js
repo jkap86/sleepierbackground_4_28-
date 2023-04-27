@@ -4,26 +4,11 @@ const User = db.users;
 const League = db.leagues;
 const Trade = db.trades;
 const Op = db.Sequelize.Op;
-const https = require('https');
-const axios = require('axios').create({
-    headers: {
-        'content-type': 'application/json'
-    },
-    httpsAgent: new https.Agent({ rejectUnauthorized: false, keepAlive: true }),
-    timeout: 2000
-});
-const axiosRetry = require('axios-retry');
+
+const axios = require('../api/axiosInstance');
 const ALLPLAYERS = require('../../allplayers.json');
 
-axiosRetry(axios, {
-    retries: 3,
-    retryCondition: () => {
-        return true;
-    },
-    retryDelay: (retryCount) => {
-        return retryCount * 1000
-    },
-})
+
 
 exports.boot = async (app) => {
     const getAllPlayers = async () => {
@@ -388,7 +373,7 @@ exports.leaguemates = async (app) => {
         })
 
         try {
-            await User.bulkCreate(users_to_update_batch_time, { updateOnDuplicate: ['updatedAt'] })
+            await User.bulkCreate(users_to_update_batch_time, { updateOnDuplicate: ['username', 'avatar', 'updatedAt'] })
         } catch (error) {
             console.log(error)
         }
