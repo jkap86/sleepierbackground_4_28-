@@ -26,7 +26,7 @@ function start() {
 
 
     const db = require("./app/models");
-    db.sequelize.sync({ alter: true })
+    db.sequelize.sync()
         .then(() => {
             console.log("Synced db.");
         })

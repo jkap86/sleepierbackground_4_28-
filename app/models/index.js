@@ -36,6 +36,9 @@ db.leagues.belongsToMany(db.users, { through: 'userLeagues' })
 db.leagues.hasMany(db.trades)
 db.trades.belongsTo(db.leagues)
 
+db.users.belongsToMany(db.trades, { through: 'usertrades' })
+db.trades.belongsToMany(db.users, { through: 'usertrades' })
+
 /*
 db.users.belongsToMany(db.users, { as: 'leaguemates', through: db.userLeaguemates })
 

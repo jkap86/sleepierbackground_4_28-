@@ -68,6 +68,7 @@ exports.trades = async (app) => {
                 console.log(`Transactions Sync completed at ${new Date()}`)
             } else {
                 'Trade sync skipped - another sync in progress'
+                return
             }
 
             const used = process.memoryUsage()
@@ -237,6 +238,7 @@ exports.leaguemates = async (app) => {
             console.log(`Leaguemates Sync completed at ${new Date()}`)
         } else {
             'Trade sync skipped - another sync in progress'
+            return
         }
 
         const used = process.memoryUsage()
