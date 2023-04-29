@@ -34,9 +34,10 @@ function start() {
             console.log("Failed to sync db: " + err.message);
         })
 
-
-    require("./app/routes/sync.routes")(app);
-    require("./app/routes/dynastyrankings.routes")(app);
+        require('./app/scheduledTasks/sync.routes')(app)
+        require('./app/scheduledTasks/dynastyrankings.routes')(app)
+    
+ 
 
     app.get('/', (req, res) => {
         res.send('ping')
@@ -49,6 +50,7 @@ function start() {
     const PORT = process.env.PORT || 5001;
     app.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}.`);
+      
     });
 
 }

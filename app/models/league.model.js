@@ -30,10 +30,7 @@ module.exports = (sequelize, Sequelize, user_league) => {
         },
         drafts: {
             type: Sequelize.JSONB
-        },
-        ...Object.fromEntries(Array.from(Array(18).keys()).map(key => {
-            return [`matchups_${key + 1}`, { type: Sequelize.JSONB }]
-        }))
+        }
     }, {
         indexes: [
             {
@@ -46,7 +43,7 @@ module.exports = (sequelize, Sequelize, user_league) => {
                 console.log(leagues.length)
                 const users = []
                 const userLeagueData = []
-                const userLeaguemateData = []
+             
                 leagues.map(league => {
                     return (league.dataValues.rosters
                         ?.filter(r => r.user_id !== null && parseInt(r.user_id) > 0) || [])
@@ -63,17 +60,6 @@ module.exports = (sequelize, Sequelize, user_league) => {
                                 type: '',
                                 updatedAt: new Date()
                             })
-
-                            league.dataValues.rosters
-                                .filter(r => parseInt(r.user_id) > 0 && r.user_id !== roster.user_id)
-                                .map(lmRoster => {
-                                    userLeaguemateData.push({
-                                        userUserId: roster.user_id,
-                                        leaguemateUserId: lmRoster.user_id
-                                    })
-
-                                    return
-                                })
                         })
                 })
 
