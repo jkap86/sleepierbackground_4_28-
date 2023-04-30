@@ -10,7 +10,7 @@ const sequelize = new Sequelize(dbConfig.DATABASE_URL, {
     dialectOptions: { ssl: ssl, useUTC: false },
     logging: false,
     pool: {
-        max: 5,
+        max: 100,
         min: 0,
         acquire: 30000,
         idle: 10000
@@ -30,14 +30,14 @@ const player_data = require("./dynastyrankings.model.js")(sequelize, Sequelize)
 db.dynastyrankings = player_data.DynastyRankings
 db.stats = player_data.Stats
 
-db.users.belongsToMany(db.leagues, { through: {model: 'userLeagues'} })
-db.leagues.belongsToMany(db.users, { through: {model: 'userLeagues'} })
+db.users.belongsToMany(db.leagues, { through: { model: 'userLeagues' } })
+db.leagues.belongsToMany(db.users, { through: { model: 'userLeagues' } })
 
 db.leagues.hasMany(db.trades)
 db.trades.belongsTo(db.leagues)
 
-db.users.belongsToMany(db.trades, { through: {model: 'usertrades'} })
-db.trades.belongsToMany(db.users, { through: {model: 'usertrades'} })
+db.users.belongsToMany(db.trades, { through: { model: 'usertrades' } })
+db.trades.belongsToMany(db.users, { through: { model: 'usertrades' } })
 
 /*
 db.users.belongsToMany(db.users, { as: 'leaguemates', through: db.userLeaguemates })

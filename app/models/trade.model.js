@@ -48,13 +48,12 @@ module.exports = (sequelize, Sequelize) => {
             afterBulkCreate: async (trades, options) => {
                 const userTradeData = []
 
-                for (const trade of trades) {
-
-                    for (const m of trade.managers.filter(m => parseInt(m) > 0)) {
+                await Promise.all(trades.filter(trade => trade.isNewRecord).map(async trade => {
+                    await Promise.all(trade.managers.filter(m => parseInt(m) > 0).map(async m => {
                         const manager = await sequelize.model('user').findByPk(m)
                         const manager_leagues = await manager.getLeagues()
 
-                        for (const manager_league of manager_leagues) {
+                        await Promise.all(manager_leagues.map(async manager_league => {
                             const manager_lm = await manager_league.getUsers()
                             manager_lm
                                 .filter(m_lm => parseInt(m_lm.user_id) > 0)
@@ -66,11 +65,10 @@ module.exports = (sequelize, Sequelize) => {
 
 
                                 })
-                        }
+                        }))
+                    }))
+                }))
 
-
-                    }
-                }
                 try {
                     await sequelize.model('usertrades').bulkCreate(userTradeData, { ignoreDuplicates: true })
 

@@ -5,7 +5,7 @@ const axiosInstance = axios.create({
     headers: {
         'content-type': 'application/json'
     },
-    httpsAgent: new https.Agent({ rejectUnauthorized: false, keepAlive: true, keepAliveTimeout: 15000, maxSockets: 1000 }),
+    httpsAgent: new https.Agent({ rejectUnauthorized: false, keepAlive: true }),
     timeout: 5000
 });
 

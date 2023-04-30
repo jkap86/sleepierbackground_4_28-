@@ -353,7 +353,7 @@ exports.updateHistorical = async (app) => {
     
     */
     setTimeout(async () => {
-        app.set('syncing', 'true')
+
         console.log('Updating dynasty values')
         const ktc_historical = await axios.post('https://keeptradecut.com/dynasty-rankings/history')
         const stateAllPlayers = app.get('allplayers')
@@ -396,7 +396,7 @@ exports.updateHistorical = async (app) => {
         } catch (error) {
             console.log(error)
         }
-        app.set('syncing', 'false')
+
         console.log('Update complete')
     }, 5000)
 }
@@ -406,7 +406,7 @@ exports.historical = async (app) => {
 
 
     setTimeout(async () => {
-        app.set('syncing', 'true')
+
         const stateAllPlayers = app.get('allplayers')
         console.log('getting historical values')
         const rankings_all = await DynastyRankings.findAll({})
@@ -423,7 +423,7 @@ exports.historical = async (app) => {
             console.log(error)
         }
 
-        app.set('syncing', 'false')
+
         console.log('historical values update complete')
 
     }, [3000])
@@ -432,7 +432,7 @@ exports.historical = async (app) => {
 
 exports.updateDaily = async (app) => {
     const getDailyValues = async () => {
-        app.set('syncing', 'true')
+
         console.log(`Beginning daily rankings update at ${new Date()}`)
 
         const stateAllPlayers = app.get('allplayers')
@@ -457,7 +457,7 @@ exports.updateDaily = async (app) => {
         } catch (error) {
             console.log(error)
         }
-        app.set('syncing', 'false')
+
         console.log(`Update Complete`)
     }
 
