@@ -5,7 +5,7 @@ const League = db.leagues;
 const Trade = db.trades;
 const Op = db.Sequelize.Op;
 
-const axios = require('axios');
+const axios = require('../api/axiosInstance');
 const ALLPLAYERS = require('../../allplayers.json');
 
 
@@ -86,7 +86,7 @@ exports.trades = async (app) => {
     const updateTrades = async (app) => {
         const state = app.get('state')
         let i = app.get('trades_sync_counter')
-        const increment = 100
+        const increment = 250
 
         let leagues_to_update;
         try {
@@ -115,7 +115,7 @@ exports.trades = async (app) => {
                     transactions_league = await axios.get(`https://api.sleeper.app/v1/league/${league.dataValues.league_id}/transactions/${state.season_type === 'regular' ? state.week : 1}`)
                 } catch (error) {
                     console.log(error)
-
+                    transactions_league.data = []
                 }
 
                 try {
@@ -255,7 +255,7 @@ exports.leaguemates = async (app) => {
     const updateLeaguemateLeagues = async (app) => {
         const state = app.get('state')
         const week = state.season_type === 'regular' ? state.week : 1
-        const increment_new = 100;
+        const increment_new = 150;
 
         const cutoff = new Date(new Date() - (24 * 60 * 60 * 1000))
 
@@ -376,7 +376,7 @@ exports.leaguemates = async (app) => {
 
             let all_users_to_update = Array.from(new Set([...users_to_update, ...new_users_to_update.flatMap(user => user.dataValues.user_id)]))
 
-            let users_to_update_batch = all_users_to_update.slice(0, 250)
+            let users_to_update_batch = all_users_to_update.slice(0, 100)
 
             const users_to_update_batch_time = users_to_update_batch.map(user => ({
                 user_id: user,
@@ -555,7 +555,7 @@ exports.leaguemates = async (app) => {
             }
         } catch (error) {
             console.error(`Error processing league ${leagueId}: ${error.message}`);
-            return null;
+
         }
     }
 

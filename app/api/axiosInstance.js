@@ -6,11 +6,15 @@ const axiosInstance = axios.create({
         'content-type': 'application/json'
     },
     httpsAgent: new https.Agent({ rejectUnauthorized: false, keepAlive: true }),
-    timeout: 5000
+    timeout: 15000
 });
 
 const axiosRetry = require('axios-retry');
 
-axiosRetry(axios, { retries: 3 })
+axiosRetry(axiosInstance, {
+    retries: 3, retryDelay: (retryNumber) => {
+        return retryNumber * 1000
+    }
+})
 
 module.exports = axiosInstance;
