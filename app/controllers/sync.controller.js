@@ -376,7 +376,7 @@ exports.leaguemates = async (app) => {
 
             let all_users_to_update = Array.from(new Set([...users_to_update, ...new_users_to_update.flatMap(user => user.dataValues.user_id)]))
 
-            let users_to_update_batch = all_users_to_update.slice(0, 100)
+            let users_to_update_batch = all_users_to_update.slice(0, 250)
 
             const users_to_update_batch_time = users_to_update_batch.map(user => ({
                 user_id: user,
