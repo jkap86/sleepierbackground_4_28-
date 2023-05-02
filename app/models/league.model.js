@@ -30,7 +30,10 @@ module.exports = (sequelize, Sequelize, user_league) => {
         },
         drafts: {
             type: Sequelize.JSONB
-        }
+        },
+        ...Object.fromEntries(Array.from(Array(18).keys()).map(key => {
+            return [`matchups_${key + 1}`, { type: Sequelize.JSONB }]
+        }))
     }, {
         indexes: [
             {
@@ -43,7 +46,7 @@ module.exports = (sequelize, Sequelize, user_league) => {
                 console.log(leagues.length)
                 const users = []
                 const userLeagueData = []
-             
+
                 leagues.map(league => {
                     return (league.dataValues.rosters
                         ?.filter(r => r.user_id !== null && parseInt(r.user_id) > 0) || [])
@@ -53,19 +56,21 @@ module.exports = (sequelize, Sequelize, user_league) => {
                                 leagueLeagueId: league.dataValues.league_id
                             })
 
-                            users.push({
-                                user_id: roster.user_id,
-                                username: roster.username,
-                                avatar: roster.avatar,
-                                type: '',
-                                updatedAt: new Date()
-                            })
+                            if (!users.find(u => u.user_id === roster.user_id)) {
+                                users.push({
+                                    user_id: roster.user_id,
+                                    username: roster.username,
+                                    avatar: roster.avatar,
+                                    type: '',
+                                    updatedAt: new Date()
+                                })
+                            }
                         })
                 })
 
 
                 try {
-                    await sequelize.model('user').bulkCreate(users, { ignoreDuplicates: true })
+                    await sequelize.model('user').bulkCreate(users, { updateOnDuplicate: ['username', 'avatar'] })
 
                     await sequelize.model('userLeagues').bulkCreate(userLeagueData, { ignoreDuplicates: true })
                 } catch (error) {
