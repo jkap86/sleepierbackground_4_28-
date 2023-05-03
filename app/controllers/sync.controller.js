@@ -106,7 +106,7 @@ exports.trades = async (app) => {
 
         let trades_league = []
 
-        const batch_size = 50
+        const batch_size = 25
 
         for (let i = 0; i < leagues_to_update.length; i += batch_size) {
             await Promise.all(leagues_to_update
