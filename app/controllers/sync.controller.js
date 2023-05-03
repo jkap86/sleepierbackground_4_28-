@@ -103,16 +103,14 @@ exports.trades = async (app) => {
         }
         console.log(`Updating trades for ${i + 1}-${Math.min(i + 1 + increment, i + leagues_to_update.length)} Leagues...`)
 
+        const trades_league = []
+        const batchSize = 25;
 
-        let trades_league = []
+        for (let i = 0; i < leagues_to_update.filter(x => x.dataValues.rosters.find(r => r.players?.length > 0)); i += batchSize) {
 
-        const batch_size = 25
-
-        for (let i = 0; i < leagues_to_update.length; i += batch_size) {
             await Promise.all(leagues_to_update
-                .filter(x => x.dataValues.rosters.find(r => r.players?.length > 0))
+                .filter(x => x.dataValues.rosters.find(r => r.players?.length > 0)).slice(i, i + batchSize)
                 .map(async league => {
-
                     let transactions_league;
 
                     try {
@@ -212,10 +210,9 @@ exports.trades = async (app) => {
                     } catch (error) {
                         console.log(error)
                     }
-
-
                 }))
         }
+
 
         try {
             await Trade.bulkCreate(trades_league, { ignoreDuplicates: true, returning: false })
