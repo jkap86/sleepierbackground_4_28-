@@ -119,7 +119,9 @@ exports.trades = async (app) => {
                         transactions_league = await axios.get(`https://api.sleeper.app/v1/league/${league.dataValues.league_id}/transactions/${state.season_type === 'regular' ? state.week : 1}`)
                     } catch (error) {
                         console.log(error)
-                        transactions_league.data = []
+                        transactions_league = {
+                            data: []
+                        }
                     }
 
                     try {
