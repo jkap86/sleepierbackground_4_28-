@@ -255,7 +255,6 @@ exports.leaguemates = async (app) => {
 
     const updateLeaguemateLeagues = async (app) => {
         const state = app.get('state')
-        const week = state.season_type === 'regular' ? state.week : 1
         const increment_new = 150;
 
         const cutoff = new Date(new Date() - (24 * 60 * 60 * 1000))
@@ -310,7 +309,7 @@ exports.leaguemates = async (app) => {
 
             app.set('leagues_to_update', leagues_to_update)
 
-            leagues_batch = await getBatchLeaguesDetails(leagues_to_add_batch)
+            leagues_batch = await getBatchLeaguesDetails(leagues_to_add_batch, state.display_week)
 
         } else if (leagues_to_update.length > 0) {
             const leagues_to_update_batch = leagues_to_update.slice(0, increment_new)
@@ -321,7 +320,7 @@ exports.leaguemates = async (app) => {
 
             app.set('leagues_to_update', leagues_to_update_pending)
 
-            leagues_batch = await getBatchLeaguesDetails(leagues_to_update_batch)
+            leagues_batch = await getBatchLeaguesDetails(leagues_to_update_batch, state.display_week)
 
         }
 
@@ -330,7 +329,7 @@ exports.leaguemates = async (app) => {
 
             await League.bulkCreate(leagues_batch, {
                 updateOnDuplicate: ["name", "avatar", "settings", "scoring_settings", "roster_positions",
-                    "rosters", "drafts", `matchups_${week}`, "updatedAt"]
+                    "rosters", "drafts", `matchups_${state.display_week}`, "updatedAt"]
             })
         }
 
@@ -491,6 +490,11 @@ exports.leaguemates = async (app) => {
             const drafts = await axios.get(`https://api.sleeper.app/v1/league/${leagueId}/drafts`)
             const traded_picks = await axios.get(`https://api.sleeper.app/v1/league/${leagueId}/traded_picks`)
 
+            let matchups = {};
+            if (display_week > 0 && display_week < 19) {
+                const matchup_week = await axios.get(`https://api.sleeper.app/v1/league/${league_id}/matchups/${display_week}`)
+                matchups[`matchups_${display_week}`] = matchup_week.data
+            }
 
             const draft_picks = getDraftPicks(traded_picks.data, rosters.data, users.data, drafts.data, league.data)
 
@@ -552,6 +556,7 @@ exports.leaguemates = async (app) => {
                 roster_positions: league.data.roster_positions,
                 rosters: rosters_username,
                 drafts: drafts_array,
+                ...matchups,
                 updatedAt: Date.now()
             }
         } catch (error) {
@@ -560,7 +565,7 @@ exports.leaguemates = async (app) => {
         }
     }
 
-    const getBatchLeaguesDetails = async (leagueIds) => {
+    const getBatchLeaguesDetails = async (leagueIds, display_week) => {
 
         const allResults = [];
 
@@ -569,7 +574,7 @@ exports.leaguemates = async (app) => {
         for (let i = 0; i < leagueIds.length; i += chunkSize) {
             const chunk = leagueIds.slice(i, i + chunkSize);
             const chunkResults = await Promise.all(chunk.map(async (leagueId) => {
-                const result = await getLeagueDetails(leagueId);
+                const result = await getLeagueDetails(leagueId, display_week);
                 return result !== null ? result : undefined;
             }));
             allResults.push(...chunkResults);

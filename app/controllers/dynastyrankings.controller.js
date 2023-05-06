@@ -647,11 +647,12 @@ exports.uploadStats = async (app) => {
 
     const stats = []
     for (let season = 2009; season < 2023; season++) {
-        const num_weeks = season < 2022 ? 16 : 17
+        const num_weeks = season < 2022 ? 17 : 18
 
         for (let week = 1; week <= num_weeks; week++) {
-            const weekly_stats = require(`../../NFL Weekly Stats 2009-2022/${season}_Week${week}_Stats.json`)
+            const weekly_stats = require(`../../../NFL_stats_weekly_2009_2022/${season}_Week${week}_Stats.json`)
 
+            console.log(`Getting stats for ${season} Week ${week}`)
             weekly_stats.map(stats_object => {
                 return stats.push({
                     season: stats_object.season,
@@ -668,9 +669,49 @@ exports.uploadStats = async (app) => {
     }
 
     try {
-        await Stats.bulkCreate(stats, { ignoreDuplicates: true })
+        fs.writeFile('/nflstats.json', JSON.stringify(weekly_stats), (err) => {
+            if (err) {
+                console.log(err)
+            } else {
+                console.log('file created')
+            }
+        })
     } catch (err) {
         console.log(err.message)
     }
 
+}
+
+exports.getStats = async (app) => {
+    let stats = require('../../stats.json')
+    for (let season = 2009; season < 2023; season++) {
+        const week = season < 2022 ? 17 : 18
+
+        const weekly_stats = await axios.get(`https://api.sleeper.com/stats/nfl/${season}/${week}?season_type=regular&position[]=QB&position[]=RB&position[]=TE&position[]=WR&order_by=pts_ppr`)
+
+        console.log(`Getting stats for ${season} Week ${week}`)
+        weekly_stats.data.map(stats_object => {
+            return stats.push({
+                season: stats_object.season,
+                week: stats_object.week,
+                player_id: stats_object.player_id,
+                team: stats_object.team,
+                opponent: stats_object.opponent,
+                stats: stats_object.stats,
+                date: stats_object.date
+            })
+        })
+    }
+
+    try {
+        fs.writeFile('./nflstats.json', JSON.stringify(stats), (err) => {
+            if (err) {
+                console.log(err)
+            } else {
+                console.log('file created')
+            }
+        })
+    } catch (err) {
+        console.log(err.message)
+    }
 }

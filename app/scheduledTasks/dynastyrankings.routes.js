@@ -13,7 +13,9 @@ module.exports = app => {
 
     //  dynastyrankings.alltime(app)
 
-    //  dynastyrankings.uploadStats(app)
+    // dynastyrankings.uploadStats(app)
+
+    //  dynastyrankings.getStats(app)
 
     app.use('/dynastyrankings', router);
 }
