@@ -36,7 +36,7 @@ exports.boot = async (app) => {
     app.set('state', state.data)
     app.set('allplayers', allplayers)
 
-    app.set('syncing', 'trades')
+    app.set('syncing', 'lm')
 
     app.set('trades_sync_counter', 0)
 
@@ -54,6 +54,23 @@ exports.boot = async (app) => {
 
         app.set('state', state.data)
         app.set('allplayers', allplayers)
+
+        try {
+            const leagues_to_delete = await League.destroy({
+                where: {
+                    '$leagues.league_id$': null
+                },
+                include: [
+                    {
+                        model: User,
+                        required: false
+                    }
+                ]
+            })
+            console.log(`${leagues_to_delete.length} Leagues Deleted`)
+        } catch (err) {
+            console.log(err)
+        }
     }, 12 * 60 * 60 * 1000)
 }
 
@@ -86,139 +103,145 @@ exports.trades = async (app) => {
     const updateTrades = async (app) => {
         const state = app.get('state')
         let i = app.get('trades_sync_counter')
-        const increment = 100
+        const increment = 50
 
-        let leagues_to_update;
-        try {
-            leagues_to_update = await League.findAll({
-                where: {
-                    season: state.league_season
-                },
-                order: [['createdAt', 'ASC']],
-                offset: i,
-                limit: increment
-            })
-        } catch (error) {
-            console.log(error)
-        }
-        console.log(`Updating trades for ${i + 1}-${Math.min(i + 1 + increment, i + leagues_to_update.length)} Leagues...`)
+        let leagues_updated = 0
 
-
-        const trades_league = []
-
-        for (const league of leagues_to_update.filter(x => x.dataValues.rosters.find(r => r.players?.length > 0))) {
-
-            let transactions_league;
-
+        for (let i = 0; i < 250; i += 50) {
+            let leagues_to_update;
             try {
-                transactions_league = await axios.get(`https://api.sleeper.app/v1/league/${league.dataValues.league_id}/transactions/${state.season_type === 'regular' ? state.week : 1}`)
+                leagues_to_update = await League.findAll({
+                    where: {
+                        season: state.league_season
+                    },
+                    order: [['createdAt', 'ASC']],
+                    offset: i,
+                    limit: i + increment
+                })
             } catch (error) {
                 console.log(error)
-                transactions_league = {
-                    data: []
-                }
             }
+            console.log(`Updating trades for ${i + 1}-${Math.min(i + 1 + increment, i + leagues_to_update.length)} Leagues...`)
 
-            try {
-                transactions_league.data
-                    .map(transaction => {
-                        const draft_order = league.dataValues.drafts.find(d => d.draft_order && d.status !== 'complete')?.draft_order
 
-                        const managers = transaction.roster_ids.map(roster_id => {
-                            const user = league.dataValues.rosters?.find(x => x.roster_id === roster_id)
+            const trades_league = []
 
-                            return user?.user_id
-                        })
+            await Promise.all(
+                leagues_to_update
+                    .map(async league => {
 
-                        const draft_picks = transaction.draft_picks.map(pick => {
-                            const roster = league.dataValues.rosters.find(x => x.roster_id === pick.roster_id)
-                            const new_roster = league.dataValues.rosters.find(x => x.roster_id === pick.owner_id)
-                            const old_roster = league.dataValues.rosters.find(x => x.roster_id === pick.previous_owner_id)
+                        let transactions_league;
 
-                            return {
-                                ...pick,
-                                original_user: {
-                                    user_id: roster?.user_id,
-                                    username: roster?.username,
-                                    avatar: roster?.avatar,
-                                },
-                                new_user: {
-                                    user_id: new_roster?.user_id,
-                                    username: new_roster?.username,
-                                    avatar: new_roster?.avatar,
-                                },
-                                old_user: {
-                                    user_id: old_roster?.user_id,
-                                    username: old_roster?.username,
-                                    avatar: old_roster?.avatar,
-                                },
-                                order: draft_order && roster?.user_id && pick.season === state.league_season ? draft_order[roster?.user_id] : null
+                        try {
+                            transactions_league = await axios.get(`https://api.sleeper.app/v1/league/${league.dataValues.league_id}/transactions/${state.season_type === 'regular' ? state.week : 1}`)
+                        } catch (error) {
+                            console.log(error)
+                            transactions_league = {
+                                data: []
                             }
-                        })
-
-                        let adds = {}
-                        transaction.adds && Object.keys(transaction.adds).map(add => {
-                            const user = league.dataValues.rosters?.find(x => x.roster_id === transaction.adds[add])
-                            return adds[add] = user?.user_id
-                        })
-
-                        let drops = {}
-                        transaction.drops && Object.keys(transaction.drops).map(drop => {
-                            const user = league.dataValues.rosters?.find(x => x.roster_id === transaction.drops[drop])
-                            return drops[drop] = user?.user_id
-                        })
-
-                        const pricecheck = []
-                        managers.map(user_id => {
-                            const count = Object.keys(adds).filter(a => adds[a] === user_id).length
-                                + draft_picks.filter(pick => pick.new_user.user_id === user_id).length
-
-                            if (count === 1) {
-                                const player = Object.keys(adds).find(a => adds[a] === user_id)
-                                if (player) {
-                                    pricecheck.push(player)
-                                } else {
-                                    const pick = draft_picks.find(pick => pick.new_user.user_id === user_id)
-                                    pricecheck.push(`${pick.season} ${pick.round}.${pick.order}`)
-                                }
-                            }
-                        })
-
-
-                        if (transaction.type === 'trade') {
-
-                            trades_league.push({
-                                transaction_id: transaction.transaction_id,
-                                leagueLeagueId: league.dataValues.league_id,
-                                status_updated: transaction.status_updated,
-                                rosters: league.dataValues.rosters,
-                                managers: managers,
-                                players: [...Object.keys(adds), ...draft_picks.map(pick => `${pick.season} ${pick.round}.${pick.order}`)],
-                                adds: adds,
-                                drops: drops,
-                                draft_picks: draft_picks,
-                                drafts: league.dataValues.drafts,
-                                price_check: pricecheck
-                            })
                         }
 
-                    })
+                        try {
+                            transactions_league.data
+                                .map(transaction => {
+                                    const draft_order = league.dataValues.drafts.find(d => d.draft_order && d.status !== 'complete')?.draft_order
 
+                                    const managers = transaction.roster_ids.map(roster_id => {
+                                        const user = league.dataValues.rosters?.find(x => x.roster_id === roster_id)
+
+                                        return user?.user_id
+                                    })
+
+                                    const draft_picks = transaction.draft_picks.map(pick => {
+                                        const roster = league.dataValues.rosters.find(x => x.roster_id === pick.roster_id)
+                                        const new_roster = league.dataValues.rosters.find(x => x.roster_id === pick.owner_id)
+                                        const old_roster = league.dataValues.rosters.find(x => x.roster_id === pick.previous_owner_id)
+
+                                        return {
+                                            ...pick,
+                                            original_user: {
+                                                user_id: roster?.user_id,
+                                                username: roster?.username,
+                                                avatar: roster?.avatar,
+                                            },
+                                            new_user: {
+                                                user_id: new_roster?.user_id,
+                                                username: new_roster?.username,
+                                                avatar: new_roster?.avatar,
+                                            },
+                                            old_user: {
+                                                user_id: old_roster?.user_id,
+                                                username: old_roster?.username,
+                                                avatar: old_roster?.avatar,
+                                            },
+                                            order: draft_order && roster?.user_id && pick.season === state.league_season ? draft_order[roster?.user_id] : null
+                                        }
+                                    })
+
+                                    let adds = {}
+                                    transaction.adds && Object.keys(transaction.adds).map(add => {
+                                        const user = league.dataValues.rosters?.find(x => x.roster_id === transaction.adds[add])
+                                        return adds[add] = user?.user_id
+                                    })
+
+                                    let drops = {}
+                                    transaction.drops && Object.keys(transaction.drops).map(drop => {
+                                        const user = league.dataValues.rosters?.find(x => x.roster_id === transaction.drops[drop])
+                                        return drops[drop] = user?.user_id
+                                    })
+
+                                    const pricecheck = []
+                                    managers.map(user_id => {
+                                        const count = Object.keys(adds).filter(a => adds[a] === user_id).length
+                                            + draft_picks.filter(pick => pick.new_user.user_id === user_id).length
+
+                                        if (count === 1) {
+                                            const player = Object.keys(adds).find(a => adds[a] === user_id)
+                                            if (player) {
+                                                pricecheck.push(player)
+                                            } else {
+                                                const pick = draft_picks.find(pick => pick.new_user.user_id === user_id)
+                                                pricecheck.push(`${pick.season} ${pick.round}.${pick.order}`)
+                                            }
+                                        }
+                                    })
+
+
+                                    if (transaction.type === 'trade') {
+
+                                        trades_league.push({
+                                            transaction_id: transaction.transaction_id,
+                                            leagueLeagueId: league.dataValues.league_id,
+                                            status_updated: transaction.status_updated,
+                                            rosters: league.dataValues.rosters,
+                                            managers: managers,
+                                            players: [...Object.keys(adds), ...draft_picks.map(pick => `${pick.season} ${pick.round}.${pick.order}`)],
+                                            adds: adds,
+                                            drops: drops,
+                                            draft_picks: draft_picks,
+                                            drafts: league.dataValues.drafts,
+                                            price_check: pricecheck
+                                        })
+                                    }
+
+                                })
+
+                        } catch (error) {
+                            console.log(error)
+                        }
+
+
+                    }))
+
+            try {
+                await Trade.bulkCreate(trades_league, { ignoreDuplicates: true, returning: false })
+                leagues_updated += trades_league.length
             } catch (error) {
                 console.log(error)
             }
-
-
         }
 
-        try {
-            await Trade.bulkCreate(trades_league, { ignoreDuplicates: true, returning: false })
-
-        } catch (error) {
-            console.log(error)
-        }
-
-        if (leagues_to_update.length < increment) {
+        if (leagues_updated < 250) {
             app.set('trades_sync_counter', 0)
         } else {
             app.set('trades_sync_counter', i + increment)
@@ -255,9 +278,6 @@ exports.leaguemates = async (app) => {
 
     const updateLeaguemateLeagues = async (app) => {
         const state = app.get('state')
-        const increment_new = 150;
-
-        const cutoff = new Date(new Date() - (24 * 60 * 60 * 1000))
 
         const league_ids_dict = await getLeaguemateLeagues(app, state)
         const league_ids = Object.keys(league_ids_dict)
@@ -288,6 +308,10 @@ exports.leaguemates = async (app) => {
                 .filter(l => !leagues_user_db.find(l_db => l_db.league_id === l))
         ].flat()))
 
+        // update leagues  that haven't been updated in 24 hrs
+
+        const cutoff = new Date(new Date() - (24 * 60 * 60 * 1000))
+
         const leagues_to_update = Array.from(new Set([
             ...app.get('leagues_to_update'),
             ...leagues_user_db.filter(l_db => l_db.updatedAt < cutoff).flatMap(league => league.league_id)
@@ -297,6 +321,11 @@ exports.leaguemates = async (app) => {
         console.log(`${leagues_to_update.length} Leagues to Update... (${app.get('leagues_to_update').length} from previous)`)
 
         let leagues_batch;
+
+        const increment = 150;
+        const increment_new = (state.display_week > 0 || state.display_week < 19)
+            ? (increment - (25 * state.display_week))
+            : increment
 
         if (leagues_to_add.length > 0) {
             const leagues_to_add_batch = leagues_to_add.slice(0, increment_new)
@@ -309,10 +338,17 @@ exports.leaguemates = async (app) => {
 
             app.set('leagues_to_update', leagues_to_update)
 
-            leagues_batch = await getBatchLeaguesDetails(leagues_to_add_batch, state.display_week)
+            leagues_batch = await getBatchLeaguesDetails(leagues_to_add_batch, state.display_week, true)
+
+            const matchup_keys = Array.from(Array(Math.max(state.display_week, 18)).keys()).map(key => `matchups_${key + 1}`)
+
+            await League.bulkCreate(leagues_batch, {
+                updateOnDuplicate: ["name", "avatar", "settings", "scoring_settings", "roster_positions",
+                    "rosters", "drafts", ...matchup_keys, "updatedAt"]
+            })
 
         } else if (leagues_to_update.length > 0) {
-            const leagues_to_update_batch = leagues_to_update.slice(0, increment_new)
+            const leagues_to_update_batch = leagues_to_update.slice(0, increment)
 
             console.log(`Updating ${leagues_to_update_batch.length} Leagues`)
 
@@ -320,18 +356,17 @@ exports.leaguemates = async (app) => {
 
             app.set('leagues_to_update', leagues_to_update_pending)
 
-            leagues_batch = await getBatchLeaguesDetails(leagues_to_update_batch, state.display_week)
+            leagues_batch = await getBatchLeaguesDetails(leagues_to_update_batch, state.display_week, false)
 
-        }
-
-        if (leagues_to_add.length > 0 || leagues_to_update.length > 0) {
-
+            const matchup_keys = (state.display_week > 0 && state.display_week < 19) ? [`matchups_${state.display_week}`] : []
 
             await League.bulkCreate(leagues_batch, {
                 updateOnDuplicate: ["name", "avatar", "settings", "scoring_settings", "roster_positions",
-                    "rosters", "drafts", `matchups_${state.display_week}`, "updatedAt"]
+                    "rosters", "drafts", ...matchup_keys, "updatedAt"]
             })
+
         }
+
 
 
         return
@@ -344,10 +379,13 @@ exports.leaguemates = async (app) => {
 
         if (!(leagues_to_add.length + leagues_to_update.length > 0)) {
 
+            // set current time as the cutoff for next sync
+
             const lm_leagues_cutoff = app.get('lm_leagues_cutoff')
             app.set('lm_leagues_cutoff', new Date())
 
 
+            // get users that have been created since last cutoff or not updated in last 6 hrs
 
             let new_users_to_update = await User.findAll({
                 where: {
@@ -374,36 +412,39 @@ exports.leaguemates = async (app) => {
                 }
             })
 
+
+            // concat users just retrieved from db to users pending from previous syncs
+
             let all_users_to_update = Array.from(new Set([...users_to_update, ...new_users_to_update.flatMap(user => user.dataValues.user_id)]))
+
+            // get first 100 users from concat array
 
             let users_to_update_batch = all_users_to_update.slice(0, 100)
 
-            const users_to_update_batch_time = users_to_update_batch.map(user => ({
-                user_id: user,
-                updatedAt: new Date()
-            }))
-
-            try {
-                await User.bulkCreate(users_to_update_batch_time, { updateOnDuplicate: ['updatedAt'] })
-            } catch (error) {
-                console.log(error)
-            }
-
-            console.log(`Updating ${users_to_update_batch.length} of ${all_users_to_update.length} Total Users (${users_to_update.length} Existing, ${new_users_to_update.length} New)
-        : ${all_users_to_update.filter(user_id => !users_to_update_batch.includes(user_id)).length} Users pending...`)
+            // set 'users_to_update' with current users being synced filtered out
 
             app.set('users_to_update', all_users_to_update.filter(user_id => !users_to_update_batch.includes(user_id)))
 
+            console.log(`Updating ${users_to_update_batch.length} of ${all_users_to_update.length} users - (${new_users_to_update.flatMap(user => user.dataValues.user_id).filter(u => !users_to_update.includes(u)).length} New, ${users_to_update.length} from previous...)`)
+            // get dictionary of leagues - stored as object to remove duplicates
             let leaguemate_leagues = {}
 
             for (const lm of users_to_update_batch) {
                 try {
                     const lm_leagues = await axios.get(`http://api.sleeper.app/v1/user/${lm}/leagues/nfl/${state.league_season}`)
-                    lm_leagues.data.map(league => {
-                        let leagues = leaguemate_leagues[league.league_id] || []
-                        leagues.push(league.league_id)
-                        return leaguemate_leagues[league.league_id] = leagues
-                    })
+                    if (lm_leagues?.data?.length > 0) {
+                        lm_leagues.data.map(league => {
+                            let leagues = leaguemate_leagues[league.league_id] || []
+                            leagues.push(league.league_id)
+                            return leaguemate_leagues[league.league_id] = leagues
+                        })
+                    } else {
+                        await User.destroy({
+                            where: {
+                                user_id: lm
+                            }
+                        })
+                    }
                 } catch (error) {
                     console.log(error)
                 }
@@ -482,7 +523,7 @@ exports.leaguemates = async (app) => {
         return original_picks
     }
 
-    const getLeagueDetails = async (leagueId) => {
+    const getLeagueDetails = async (leagueId, display_week, new_league) => {
         try {
             const league = await axios.get(`https://api.sleeper.app/v1/league/${leagueId}`)
             const users = await axios.get(`https://api.sleeper.app/v1/league/${leagueId}/users`)
@@ -492,10 +533,55 @@ exports.leaguemates = async (app) => {
 
             let matchups = {};
             if (display_week > 0 && display_week < 19) {
-                const matchup_week = await axios.get(`https://api.sleeper.app/v1/league/${league_id}/matchups/${display_week}`)
+                const matchup_week = await axios.get(`https://api.sleeper.app/v1/league/${leagueId}/matchups/${display_week}`)
                 matchups[`matchups_${display_week}`] = matchup_week.data
             }
 
+            if (new_league) {
+                (await Promise.all(Array.from(Array(Math.max(display_week, 18)).keys())))
+                    .map(async week => {
+                        const matchup_prev = await axios.get(`https://api.sleeper.app/v1/league/${leagueId}/matchups/${week + 1}`)
+
+                        matchups[`matchups_${week + 1}`] = matchup_prev.data
+
+                    })
+            }
+
+            await User.bulkCreate(users.data.map(user => {
+                return {
+                    user_id: user.user_id,
+                    username: user.display_name,
+                    avatar: user.avatar
+                }
+            }), {
+                updateOnDuplicate: ['username', 'avatar']
+            })
+
+            if (!new_league) {
+                await db.sequelize.model('userLeagues').bulkCreate(users.data.map(user => {
+                    return {
+                        userUserId: user.user_id,
+                        leagueLeagueId: league.data.league_id
+                    }
+                }), {
+                    ignoreDuplicates: true
+                })
+
+                await db.sequelize.model('userLeagues').destroy({
+                    where: {
+                        [db.Sequelize.Op.and]: [
+                            {
+                                leagueLeagueId: league.data.league_id
+                            },
+                            {
+                                userUserId: {
+                                    [db.Sequelize.Op.not]: users.data.map(user => user.user_id)
+                                }
+                            }
+                        ]
+                    }
+                })
+            }
             const draft_picks = getDraftPicks(traded_picks.data, rosters.data, users.data, drafts.data, league.data)
 
             const drafts_array = []
@@ -560,12 +646,12 @@ exports.leaguemates = async (app) => {
                 updatedAt: Date.now()
             }
         } catch (error) {
-            console.error(`Error processing league ${leagueId}: ${error.message}`);
+            console.error(error);
 
         }
     }
 
-    const getBatchLeaguesDetails = async (leagueIds, display_week) => {
+    const getBatchLeaguesDetails = async (leagueIds, display_week, new_league) => {
 
         const allResults = [];
 
@@ -574,7 +660,7 @@ exports.leaguemates = async (app) => {
         for (let i = 0; i < leagueIds.length; i += chunkSize) {
             const chunk = leagueIds.slice(i, i + chunkSize);
             const chunkResults = await Promise.all(chunk.map(async (leagueId) => {
-                const result = await getLeagueDetails(leagueId, display_week);
+                const result = await getLeagueDetails(leagueId, display_week, new_league);
                 return result !== null ? result : undefined;
             }));
             allResults.push(...chunkResults);
